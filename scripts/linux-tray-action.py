@@ -4,11 +4,12 @@
 import argparse
 import json
 import subprocess
+import xml.etree.ElementTree as ET
 
 
 def busctl(*args):
     return subprocess.check_output(
-        ["busctl", "--user", "--no-pager", "--timeout=10", *args], text=True
+        ["busctl", "--user", "--no-pager", "--timeout=10", *args], text=True, timeout=15
     )
 
 
@@ -37,10 +38,17 @@ def main():
         and fields[1] == str(args.pid)
     ]
     for destination in destinations:
-        for path in busctl("tree", "--list", destination).splitlines():
-            path = path.strip()
-            if not path.endswith("/Menu"):
-                continue
+        # A desktop has several bus connections; inspect only the indicator subtree.
+        parent = "/org/ayatana/NotificationItem"
+        try:
+            xml = subprocess.check_output([
+                "gdbus", "introspect", "--session", "--dest", destination,
+                "--object-path", parent, "--xml",
+            ], text=True, stderr=subprocess.DEVNULL, timeout=5)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            continue
+        for node in ET.fromstring(xml).findall("node"):
+            path = f"{parent}/{node.attrib['name']}/Menu"
             layout = json.loads(busctl(
                 "--json=short", "call", destination, path,
                 "com.canonical.dbusmenu", "GetLayout", "iias", "0", "1", "0",
