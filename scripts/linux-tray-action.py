@@ -43,7 +43,7 @@ def main():
                 continue
             layout = json.loads(busctl(
                 "--json=short", "call", destination, path,
-                "com.canonical.dbusmenu", "GetLayout", "iias", "0", "-1", "0",
+                "com.canonical.dbusmenu", "GetLayout", "iias", "0", "1", "0",
             ))
             for item_id, properties, _ in menu_items(layout):
                 label = properties.get("label", {}).get("data", "")
