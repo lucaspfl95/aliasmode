@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/linux-desktop.yml
       - scripts/install-linux.sh
+      - scripts/linux-tray-action.py
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -358,10 +359,26 @@ jobs:
             console.log("Remote MCP tunnel listed " + names.length + " tools");
           '
 
-          # Closing the window with a browser still open asks first, then closes that browser
-          # and stops the sidecar.
+          # X hides the manager while the browser, sidecar and agent runtime stay alive.
           pgrep -f "profiles/$profile" >/dev/null
           wmctrl -c AliasMode
+          sleep 1
+          kill -0 "$desktop"
+          kill -0 "$sidecar"
+          test -f "$data/agent-runtime.json"
+          ! wmctrl -l | grep -q ' AliasMode$'
+          pgrep -f "profiles/$profile" >/dev/null
+          python3 scripts/linux-tray-action.py "$desktop" 'Open AliasMode'
+          for attempt in $(seq 1 30); do
+            wmctrl -l | grep -q ' AliasMode$' && break
+            sleep 1
+          done
+          wmctrl -l | grep -q ' AliasMode$'
+          "$helper" profiles list | jq -e --arg id "$profile" '.ok and any(.result.profiles[]; .id == $id and .running)'
+          shot tray-restored
+
+          # Explicit Quit still confirms active sessions and performs safe browser cleanup.
+          python3 scripts/linux-tray-action.py "$desktop" 'Quit AliasMode'
           dialog=""
           for attempt in $(seq 1 30); do
             dialog="$(xdotool search --name "Close AliasMode" 2>/dev/null | head -n 1 || true)"
@@ -446,7 +463,7 @@ jobs:
           import -window root "$evidence/link-new-profile.png" || true
           cat "$OPENED"
           desktop="$(jq -er .desktopPid "$data/agent-runtime.json")"
-          wmctrl -c AliasMode
+          python3 scripts/linux-tray-action.py "$desktop" 'Quit AliasMode'
           for attempt in $(seq 1 60); do kill -0 "$desktop" 2>/dev/null || break; sleep 1; done
           ! kill -0 "$desktop" 2>/dev/null
           curl -sf -m 60 -X DELETE "$wd/session/$session" >/dev/null || true
