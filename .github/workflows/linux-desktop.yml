@@ -1,6 +1,11 @@
 name: Linux desktop build
 
 on:
+  push:
+    branches: [feature/linux-system-tray]
+    paths:
+      - .github/workflows/linux-desktop.yml
+      - scripts/install-linux.sh
   workflow_dispatch:
   workflow_call:
     inputs:

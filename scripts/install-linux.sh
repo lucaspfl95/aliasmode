@@ -47,7 +47,8 @@ has_library() {
     || ldconfig -p 2>/dev/null | grep -q "^[[:space:]]*$1 "
 }
 
-# The app window needs WebKitGTK 4.1; the Chrome runtimes need the usual desktop libraries,
+# The app window needs WebKitGTK 4.1 and an appindicator library for its tray;
+# the Chrome runtimes need the usual desktop libraries,
 # and Chromium 155 arrives as a zstd archive.
 apt_package() {
   # Ubuntu 24.04 renamed several libraries with a t64 suffix; the old name is then virtual.
@@ -67,6 +68,9 @@ install_system_packages() {
     libcups.so.2 libxkbcommon.so.0 libXcomposite.so.1 libXdamage.so.1 libXrandr.so.2; do
     has_library "$library" || missing+=("$library")
   done
+  # The tray loads this at runtime, so ldd cannot report it as a missing dependency.
+  has_library libayatana-appindicator3.so.1 || has_library libappindicator3.so.1 \
+    || missing+=(libayatana-appindicator3.so.1)
   command -v zstd >/dev/null || missing+=(zstd)
   [[ ${#missing[@]} -gt 0 ]] || return 0
   echo "AliasMode needs these system parts: ${missing[*]}"
@@ -74,16 +78,16 @@ install_system_packages() {
     as_root apt-get update -q
     as_root apt-get install -y -q libwebkit2gtk-4.1-0 libnss3 libgbm1 "$(apt_package libasound2t64 libasound2)" \
       "$(apt_package libatk-bridge2.0-0t64 libatk-bridge2.0-0)" "$(apt_package libcups2t64 libcups2)" \
-      libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 zstd
+      libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libayatana-appindicator3-1 zstd
   elif command -v dnf >/dev/null; then
     as_root dnf install -y webkit2gtk4.1 nss mesa-libgbm alsa-lib at-spi2-atk cups-libs libxkbcommon \
-      libXcomposite libXdamage libXrandr zstd
+      libXcomposite libXdamage libXrandr libappindicator-gtk3 zstd
   elif command -v pacman >/dev/null; then
     as_root pacman -S --needed --noconfirm webkit2gtk-4.1 nss mesa alsa-lib at-spi2-core libcups libxkbcommon \
-      libxcomposite libxdamage libxrandr zstd
+      libxcomposite libxdamage libxrandr libappindicator-gtk3 zstd
   elif command -v zypper >/dev/null; then
     as_root zypper --non-interactive install libwebkit2gtk-4_1-0 mozilla-nss libgbm1 libasound2 libatk-bridge-2_0-0 \
-      libcups2 libxkbcommon0 libXcomposite1 libXdamage1 libXrandr2 zstd
+      libcups2 libxkbcommon0 libXcomposite1 libXdamage1 libXrandr2 libappindicator3-1 zstd
   else
     fail "install these with your package manager, then run this command again: ${missing[*]}"
   fi
